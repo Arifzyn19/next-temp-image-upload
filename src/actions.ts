@@ -90,13 +90,15 @@ export async function cleanupExpiredFiles() {
     }
 
     // Group files by bucket
-    const filesByBucket = expiredFiles.reduce((acc, file) => {
-      if (!acc[file.bucket_name]) {
-        acc[file.bucket_name] = [];
-      }
-      acc[file.bucket_name].push(file.file_key);
-      return acc;
-    }, {} as Record<string, string[]>);
+    const filesByBucket: Record<string, string[]> = {};
+expiredFiles.forEach((file) => {
+  if (!filesByBucket[file.bucket_name]) {
+    filesByBucket[file.bucket_name] = [];
+  }
+  if (typeof file.file_key === 'string') {
+    filesByBucket[file.bucket_name].push(file.file_key);
+  }
+});
 
     // Delete files from storage
     for (const [bucket, files] of Object.entries(filesByBucket)) {

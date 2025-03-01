@@ -1,11 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { cleanupExpiredFiles } from '@/app/actions';
+import { cleanupExpiredFiles } from '@/actions';
 
 export const dynamic = 'force-dynamic';
 
 export async function GET(request: NextRequest) {
-  // Jika dibutuhkan, tambahkan autentikasi untuk API cron
-  // Contoh: cek secret key di header
   const authHeader = request.headers.get('authorization');
   if (!process.env.CRON_SECRET_KEY || authHeader !== `Bearer ${process.env.CRON_SECRET_KEY}`) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
