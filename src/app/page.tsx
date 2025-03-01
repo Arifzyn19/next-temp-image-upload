@@ -13,7 +13,7 @@ export default function Home() {
       <FileUpload />
       
       <div className="mt-12 text-center text-sm">
-        <p>Dibuat dengan Next.js, shadcn/ui, dan Supabase</p>
+        <p>Dibuat dengan Next.js, tailwindcss, dan Supabase</p>
       </div>
     </div>
   );
