@@ -176,7 +176,7 @@ export default function FileUpload() {
   return (
     <div className="w-full max-w-md mx-auto">
       <Card className="shadow-lg border-opacity-50">
-        <CardHeader className="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-t-lg">
+        <CardHeader className="rounded-t-lg">
           <CardTitle className="text-center text-xl font-bold text-gray-800">
             {config.title} Sementara
           </CardTitle>
