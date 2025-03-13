@@ -25,10 +25,10 @@ export async function POST(request: NextRequest) {
     }
 
     // Validasi ukuran file (maks 5MB untuk semua tipe file)
-    const maxSize = 5 * 1024 * 1024; // 5MB
+    const maxSize = 50 * 1024 * 1024; // 5MB
     if (file.size > maxSize) {
       return NextResponse.json(
-        { success: false, error: 'Ukuran file melebihi 5MB' },
+        { success: false, error: 'Ukuran file melebihi 50MB' },
         { status: 400 }
       );
     }

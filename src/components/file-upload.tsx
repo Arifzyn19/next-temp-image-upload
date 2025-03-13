@@ -1,17 +1,21 @@
 "use client";
 
-import { useState, useRef } from "react";
+import { useState, useRef, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { uploadImage } from "@/actions";
+import { uploadImage, getDirectUploadUrl, completeDirectUpload } from "@/actions";
 import ResultCard from "@/components/result-card";
 import { formatFileSize } from "@/lib/utils";
 import { Camera, Video, Music, Image, Upload, X } from "lucide-react";
+import { Progress } from "@/components/ui/progress";
+
+const DIRECT_UPLOAD_THRESHOLD = 5 * 1024 * 1024; // 5MB
 
 export default function FileUpload() {
   const [file, setFile] = useState<File | null>(null);
   const [isUploading, setIsUploading] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState(0);
   const [uploadResult, setUploadResult] = useState<{
     success: boolean;
     fileUrl?: string;
@@ -32,7 +36,7 @@ export default function FileUpload() {
     },
     video: {
       accept: "video/*",
-      maxSize: 100 * 1024 * 1024, // 100MB
+      maxSize: 50 * 1024 * 1024, // 100MB
       icon: <Video className="w-10 h-10 mb-3 text-primary" />,
       extensions: "MP4, MOV atau WebM",
       title: "Unggah Video"
@@ -50,6 +54,7 @@ export default function FileUpload() {
     setActiveTab(value);
     setFile(null);
     setUploadResult(null);
+    setUploadProgress(0);
   };
 
   const validateFile = (selectedFile: File) => {
@@ -78,6 +83,7 @@ export default function FileUpload() {
       if (validateFile(selectedFile)) {
         setFile(selectedFile);
         setUploadResult(null);
+        setUploadProgress(0);
       }
     }
   };
@@ -104,6 +110,7 @@ export default function FileUpload() {
       if (validateFile(selectedFile)) {
         setFile(selectedFile);
         setUploadResult(null);
+        setUploadProgress(0);
       }
     }
   };
@@ -111,9 +118,72 @@ export default function FileUpload() {
   const handleRemoveFile = () => {
     setFile(null);
     setUploadResult(null);
+    setUploadProgress(0);
     if (fileInputRef.current) {
       fileInputRef.current.value = "";
     }
+  };
+
+  // Standard upload for smaller files
+  const performStandardUpload = async (selectedFile: File) => {
+    const formData = new FormData();
+    formData.append('file', selectedFile);
+    formData.append('fileType', activeTab);
+    
+    const result = await uploadImage(formData);
+    setUploadResult(result);
+  };
+
+  // Direct upload with progress for larger files
+  const performDirectUpload = async (selectedFile: File) => {
+    // Step 1: Get signed URL for direct upload
+    const signedUrlResult = await getDirectUploadUrl(
+      selectedFile.name, 
+      activeTab, 
+      selectedFile.type
+    );
+    
+    if (!signedUrlResult.success || !signedUrlResult.signedUrl) {
+      setUploadResult({
+        success: false,
+        error: signedUrlResult.error || 'Gagal mendapatkan URL unggahan'
+      });
+      return;
+    }
+    
+    // Step 2: Upload directly to storage with progress tracking
+    const xhr = new XMLHttpRequest();
+    
+    xhr.upload.addEventListener('progress', (event) => {
+      if (event.lengthComputable) {
+        const percentComplete = Math.round((event.loaded / event.total) * 100);
+        setUploadProgress(percentComplete);
+      }
+    });
+    
+    xhr.addEventListener('load', async () => {
+      if (xhr.status >= 200 && xhr.status < 300) {
+        // Step 3: Complete the upload process
+        const completionResult = await completeDirectUpload(signedUrlResult.fileKey!);
+        setUploadResult(completionResult);
+      } else {
+        setUploadResult({
+          success: false,
+          error: `Kesalahan unggahan: ${xhr.status} ${xhr.statusText}`
+        });
+      }
+    });
+    
+    xhr.addEventListener('error', () => {
+      setUploadResult({
+        success: false,
+        error: 'Koneksi gagal saat mengunggah file'
+      });
+    });
+    
+    xhr.open('PUT', signedUrlResult.signedUrl);
+    xhr.setRequestHeader('Content-Type', selectedFile.type);
+    xhr.send(selectedFile);
   };
 
   const handleUpload = async () => {
@@ -121,18 +191,19 @@ export default function FileUpload() {
     
     try {
       setIsUploading(true);
+      setUploadProgress(0);
       
-      const formData = new FormData();
-      formData.append('file', file);
-      formData.append('fileType', activeTab);
-      
-      const result = await uploadImage(formData);
-      setUploadResult(result);
-    } catch (error) {
+      // Choose upload method based on file size
+      if (file.size > DIRECT_UPLOAD_THRESHOLD) {
+        await performDirectUpload(file);
+      } else {
+        await performStandardUpload(file);
+      }
+    } catch (error: any) {
       console.error('Upload error:', error);
       setUploadResult({
         success: false,
-        error: 'Terjadi kesalahan saat mengunggah file'
+        error: error.message || 'Terjadi kesalahan saat mengunggah file'
       });
     } finally {
       setIsUploading(false);
@@ -257,7 +328,14 @@ export default function FileUpload() {
             </div>
           </div>
         </CardContent>
-        <CardFooter className="flex flex-col gap-2">
+        <CardFooter className="flex flex-col gap-4">
+          {isUploading && uploadProgress > 0 && (
+            <div className="w-full">
+              <Progress value={uploadProgress} className="h-2" />
+              <p className="text-xs text-center mt-1 text-gray-500">{uploadProgress}% selesai</p>
+            </div>
+          )}
+          
           <Button 
             onClick={handleUpload} 
             disabled={!file || isUploading} 
